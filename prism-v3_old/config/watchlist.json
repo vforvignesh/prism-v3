@@ -1,0 +1,19 @@
+{
+  "tickers": {
+    "NVDA": {"sector": "Semiconductors", "thesis": "AI datacenter GPU dominance", "added": "2026-02-11"},
+    "AMD":  {"sector": "Semiconductors", "thesis": "CPU/GPU share gains, AI accelerator ramp", "added": "2026-02-11"},
+    "MU":   {"sector": "Semiconductors", "thesis": "HBM memory cycle, cheapest semi on PEG", "added": "2026-02-11"},
+    "TSM":  {"sector": "Semiconductors", "thesis": "Foundry monopoly, AI capex beneficiary", "added": "2026-02-11"},
+    "AVGO": {"sector": "Semiconductors", "thesis": "Custom ASIC + VMware integration", "added": "2026-02-11"},
+    "UBER": {"sector": "Tech/Mobility", "thesis": "Platform scale, AV optionality", "added": "2026-02-10"},
+    "RBRK": {"sector": "Cybersecurity", "thesis": "Data security growth, cloud transition", "added": "2026-02-10"},
+    "GRAB": {"sector": "Tech/Mobility", "thesis": "SE Asia superapp, path to profitability", "added": "2026-02-10"},
+    "HROW": {"sector": "Healthcare", "thesis": "Specialty pharma growth, niche moat", "added": "2026-02-10"},
+    "OSCR": {"sector": "Healthcare", "thesis": "Health insurance disruptor, tech-enabled", "added": "2026-02-10"},
+    "NFLX": {"sector": "Media/Tech", "thesis": "Ad tier monetization, content moat", "added": "2026-02-10"},
+    "LLY":  {"sector": "Healthcare", "thesis": "GLP-1 franchise dominance", "added": "2026-02-10"},
+    "CNC":  {"sector": "Healthcare", "thesis": "Managed care value, Medicaid exposure", "added": "2026-02-10"}
+  },
+  "growth_overrides": {},
+  "notes": "Initial watchlist from PRISM v2.2 sessions. Add/remove tickers via dashboard or edit this file."
+}
