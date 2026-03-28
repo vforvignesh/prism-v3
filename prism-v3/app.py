@@ -71,9 +71,21 @@ st.markdown("""
 
     /* Main content area */
     .main .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        max-width: 1600px;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 1800px;
+    }
+
+    /* Consistent section spacing */
+    section {
+        margin-bottom: 2rem;
+    }
+
+    /* Spacing between tabs and content */
+    .stTabs {
+        margin-bottom: 1.5rem;
     }
 
     /* ===== HEADER ===== */
@@ -174,7 +186,12 @@ st.markdown("""
         background: #0d1320 !important;
         border: 1px solid #1a2233 !important;
         border-radius: 4px !important;
-        padding: 0.75rem 1rem !important;
+        padding: 1rem 1.2rem !important;
+        margin-bottom: 0.8rem !important;
+        transition: border-color 0.2s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        border-color: #FF6600 !important;
     }
     div[data-testid="stMetric"] label {
         color: #6B7B8D !important;
@@ -197,6 +214,8 @@ st.markdown("""
     .stDataFrame {
         border: 1px solid #1a2233;
         border-radius: 4px;
+        margin: 1.5rem 0;
+        overflow: hidden;
     }
     .stDataFrame [data-testid="stDataFrameResizable"] {
         font-family: 'JetBrains Mono', monospace !important;
@@ -204,19 +223,24 @@ st.markdown("""
 
     /* Target the table headers and cells */
     .stDataFrame th {
-        background: #f7fafc !important;
-        color: #2d3748 !important;
+        background: #0d1320 !important;
+        color: #8899AA !important;
         font-family: 'JetBrains Mono', monospace !important;
         font-size: 0.7rem !important;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        border-bottom: 1px solid #e2e8f0 !important;
+        border-bottom: 1px solid #1a2233 !important;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     .stDataFrame td {
-        color: #1a202c !important;
+        color: #e2e8f0 !important;
         font-family: 'JetBrains Mono', monospace !important;
         font-size: 0.8rem !important;
-        border-bottom: 1px solid #edf2f7 !important;
+        border-bottom: 1px solid #1a2233 !important;
+        padding: 8px 12px !important;
     }
 
     /* ===== SECTION HEADERS ===== */
@@ -331,7 +355,9 @@ st.markdown("""
     .stPlotlyChart {
         border: 1px solid #1a2233;
         border-radius: 4px;
-        padding: 0.25rem;
+        padding: 1rem;
+        margin: 1rem 0;
+        background: #0d1320;
     }
 
     /* ===== CUSTOM KPI ROW ===== */
@@ -339,8 +365,17 @@ st.markdown("""
         background: #0d1320;
         border: 1px solid #1a2233;
         border-radius: 4px;
-        padding: 0.8rem 1rem;
+        padding: 1.2rem 1.5rem;
         text-align: center;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        border-color: #FF6600;
     }
     .kpi-label {
         font-family: 'JetBrains Mono', monospace;
@@ -360,6 +395,50 @@ st.markdown("""
     .kpi-value.amber { color: #FFB800; }
     .kpi-value.red { color: #FF4444; }
     .kpi-value.orange { color: #FF6600; }
+
+    /* ===== RESPONSIVE DESIGN ===== */
+    /* Mobile devices */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding: 1rem;
+        }
+        
+        .kpi-card {
+            min-height: 80px;
+            padding: 0.8rem 1rem;
+        }
+        
+        .prism-header {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .prism-live {
+            margin-top: 0.5rem;
+        }
+        
+        /* Stack tables and charts vertically */
+        .stTabs [data-baseweb="tab-panel"] {
+            display: block !important;
+        }
+        
+        /* Reduce font sizes */
+        .kpi-value {
+            font-size: 1.2rem !important;
+        }
+    }
+    
+    /* Tablet */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .main .block-container {
+            padding: 1.5rem;
+        }
+        
+        /* Adjust column counts */
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -383,63 +462,59 @@ st.markdown(f"""
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### ⚙ Configuration")
+    st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
     # Watchlist management
-    st.markdown("#### Watchlist")
-    all_tickers = list(watchlist["tickers"].keys())
-
-    # Add ticker
-    new_ticker = st.text_input("Add ticker", placeholder="e.g. AAPL", key="add_ticker")
-    if new_ticker and st.button("Add", key="btn_add"):
-        sym = new_ticker.upper().strip()
-        if sym not in watchlist["tickers"]:
-            watchlist["tickers"][sym] = {
-                "sector": "", "thesis": "", "added": datetime.now().strftime("%Y-%m-%d")
-            }
-            with open(CONFIG_DIR / "watchlist.json", "w") as f:
-                json.dump(watchlist, f, indent=2)
-            st.cache_data.clear()
-            st.rerun()
-        else:
-            st.warning(f"{sym} already in watchlist")
-
-    # Active tickers
-    active_tickers = st.multiselect(
-        "Active tickers",
-        options=all_tickers,
-        default=all_tickers,
-        key="active_tickers"
-    )
-
-    st.markdown("---")
+    with st.expander("📋 Watchlist Management", expanded=True):
+        all_tickers = list(watchlist["tickers"].keys())
+        
+        # Add ticker
+        new_ticker = st.text_input("Add ticker", placeholder="e.g. AAPL", key="add_ticker")
+        if new_ticker and st.button("Add", key="btn_add"):
+            sym = new_ticker.upper().strip()
+            if sym not in watchlist["tickers"]:
+                watchlist["tickers"][sym] = {
+                    "sector": "", "thesis": "", "added": datetime.now().strftime("%Y-%m-%d")
+                }
+                with open(CONFIG_DIR / "watchlist.json", "w") as f:
+                    json.dump(watchlist, f, indent=2)
+                st.cache_data.clear()
+                st.rerun()
+            else:
+                st.warning(f"{sym} already in watchlist")
+        
+        # Active tickers
+        active_tickers = st.multiselect(
+            "Active tickers",
+            options=all_tickers,
+            default=all_tickers,
+            key="active_tickers"
+        )
 
     # Scoring weights
-    st.markdown("#### Scoring Weights")
-    w_fund = st.slider("Fundamental", 0, 100, int(settings["scoring_weights"]["fundamental"] * 100), 5, key="w_fund")
-    w_risk = st.slider("Risk", 0, 100, int(settings["scoring_weights"]["risk"] * 100), 5, key="w_risk")
-    w_tech = st.slider("Technical", 0, 100, int(settings["scoring_weights"]["technical"] * 100), 5, key="w_tech")
-
-    total_w = w_fund + w_risk + w_tech
-    if total_w > 0:
-        settings["scoring_weights"]["fundamental"] = w_fund / total_w
-        settings["scoring_weights"]["risk"] = w_risk / total_w
-        settings["scoring_weights"]["technical"] = w_tech / total_w
-    st.caption(f"Normalized: {w_fund/total_w:.0%} | {w_risk/total_w:.0%} | {w_tech/total_w:.0%}" if total_w > 0 else "")
-
-    st.markdown("---")
+    with st.expander("⚖️ Scoring Weights", expanded=True):
+        w_fund = st.slider("Fundamental", 0, 100, int(settings["scoring_weights"]["fundamental"] * 100), 5, key="w_fund")
+        w_risk = st.slider("Risk", 0, 100, int(settings["scoring_weights"]["risk"] * 100), 5, key="w_risk")
+        w_tech = st.slider("Technical", 0, 100, int(settings["scoring_weights"]["technical"] * 100), 5, key="w_tech")
+        
+        total_w = w_fund + w_risk + w_tech
+        if total_w > 0:
+            settings["scoring_weights"]["fundamental"] = w_fund / total_w
+            settings["scoring_weights"]["risk"] = w_risk / total_w
+            settings["scoring_weights"]["technical"] = w_tech / total_w
+        st.caption(f"Normalized: {w_fund/total_w:.0%} | {w_risk/total_w:.0%} | {w_tech/total_w:.0%}" if total_w > 0 else "")
 
     # Index benchmarks
-    st.markdown("#### Benchmark")
-    idx_pe = st.number_input("Index PE", value=22.0, step=0.5, key="idx_pe")
-    idx_growth = st.number_input("Index Growth (%)", value=13.0, step=0.5, key="idx_growth")
+    with st.expander("📊 Benchmarks", expanded=False):
+        idx_pe = st.number_input("Index PE", value=22.0, step=0.5, key="idx_pe")
+        idx_growth = st.number_input("Index Growth (%)", value=13.0, step=0.5, key="idx_growth")
 
-    st.markdown("---")
-
-    # Refresh
+    # Refresh button with spacing
+    st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
     if st.button("⟳ REFRESH DATA", use_container_width=True, key="btn_refresh"):
         st.cache_data.clear()
         st.rerun()
-
+    
     st.caption(f"Last: {datetime.now().strftime('%H:%M:%S')}")
 
 
@@ -514,7 +589,7 @@ with tab_watchlist:
     buy_color = "green" if buy_zone_count > 0 else "amber"
 
     st.markdown(f"""
-    <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
         <div class="kpi-card">
             <div class="kpi-label">STOCKS</div>
             <div class="kpi-value orange">{len(scored_df)}</div>
@@ -691,7 +766,7 @@ with tab_watchlist:
 
     # --- Charts ---
     st.markdown("### Score Distribution")
-    col_chart1, col_chart2 = st.columns(2)
+    col_chart1, col_chart2 = st.columns(2, gap="large")
 
     with col_chart1:
         fig_prism = px.bar(
@@ -762,7 +837,7 @@ with tab_detail:
         st.markdown("---")
 
         # Metrics grid
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4 = st.columns(4, gap="large")
         with c1:
             st.metric("Price", f"${row.get('Price', 0):.2f}")
             st.metric("PE (Forward)", f"{row.get('PE (Fwd)', 0):.1f}x")
@@ -1032,7 +1107,7 @@ with tab_quality:
         ).value_counts()
 
         st.markdown(f"""
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 1rem;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
             <div class="kpi-card">
                 <div class="kpi-label">HIGH CONFIDENCE</div>
                 <div class="kpi-value green">{conf_counts.get("HIGH", 0)}</div>
