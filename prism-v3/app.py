@@ -204,19 +204,19 @@ st.markdown("""
 
     /* Target the table headers and cells */
     .stDataFrame th {
-        background: #0d1320 !important;
-        color: #8899AA !important;
+        background: #f7fafc !important;
+        color: #2d3748 !important;
         font-family: 'JetBrains Mono', monospace !important;
         font-size: 0.7rem !important;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        border-bottom: 1px solid #1a2233 !important;
+        border-bottom: 1px solid #e2e8f0 !important;
     }
     .stDataFrame td {
-        color: #E8EDF2 !important;
+        color: #1a202c !important;
         font-family: 'JetBrains Mono', monospace !important;
         font-size: 0.8rem !important;
-        border-bottom: 1px solid #111927 !important;
+        border-bottom: 1px solid #edf2f7 !important;
     }
 
     /* ===== SECTION HEADERS ===== */
@@ -562,7 +562,7 @@ with tab_watchlist:
                 return "background-color: #3D2E00; color: #FFB800; font-weight: 600"
             else:
                 return "background-color: #3D0000; color: #FF4444; font-weight: 600"
-        return "color: #E8EDF2"
+        return "color: #1a202c"
 
     def color_shock(val):
         try:
@@ -574,7 +574,7 @@ with tab_watchlist:
             else:
                 return "background-color: #3D0000; color: #FF4444"
         except (ValueError, TypeError):
-            return "color: #E8EDF2"
+            return "color: #1a202c"
 
     def color_52w(val):
         try:
@@ -583,9 +583,9 @@ with tab_watchlist:
                 return "background-color: #003D22; color: #00FF88"
             elif v > 0.9:
                 return "background-color: #3D0000; color: #FF4444"
-            return "color: #E8EDF2"
+            return "color: #1a202c"
         except (ValueError, TypeError):
-            return "color: #E8EDF2"
+            return "color: #1a202c"
 
     def color_rsi(val):
         try:
@@ -594,9 +594,9 @@ with tab_watchlist:
                 return "background-color: #003D22; color: #00FF88"  # oversold = opportunity
             elif v > 70:
                 return "background-color: #3D0000; color: #FF4444"  # overbought
-            return "color: #E8EDF2"
+            return "color: #1a202c"
         except (ValueError, TypeError):
-            return "color: #E8EDF2"
+            return "color: #1a202c"
 
     def color_edge(val):
         try:
@@ -607,9 +607,9 @@ with tab_watchlist:
                 return "color: #FFB800"
             elif v < 0:
                 return "color: #FF4444"
-            return "color: #E8EDF2"
+            return "color: #1a202c"
         except (ValueError, TypeError):
-            return "color: #E8EDF2"
+            return "color: #1a202c"
 
     def color_recovery(val):
         if val == "YES":
@@ -618,10 +618,10 @@ with tab_watchlist:
             return "background-color: #3D2E00; color: #FFB800"
         elif val == "NO":
             return "background-color: #3D0000; color: #FF4444"
-        return "color: #E8EDF2"
+        return "color: #1a202c"
 
     def base_text(val):
-        return "color: #E8EDF2"
+        return "color: #1a202c"
 
     def color_flags(val):
         if val and val != "—":
@@ -646,7 +646,7 @@ with tab_watchlist:
             "RSI": "{:.0f}",
         }.items() if k in display_df.columns
     }, na_rep="—").set_properties(**{
-        "color": "#E8EDF2",
+        "color": "#1a202c",
         "font-family": "JetBrains Mono, monospace",
         "font-size": "0.8rem",
         "border-bottom": "1px solid #111927",
@@ -909,7 +909,7 @@ with tab_stress:
                 "Probability": "{:.0%}",
                 "Weighted Impact (%)": "{:.2f}%"
             }).set_properties(**{
-                "color": "#E8EDF2",
+                "color": "#1a202c",
                 "font-family": "JetBrains Mono, monospace",
                 "font-size": "0.8rem",
             }).set_table_styles([
@@ -957,7 +957,7 @@ with tab_stress:
             return "background-color: #3D2E00; color: #FFB800"
         elif val == "NO":
             return "background-color: #3D0000; color: #FF4444"
-        return "color: #E8EDF2"
+        return "color: #1a202c"
 
     st.dataframe(
         recovery_df.style.format({
@@ -969,7 +969,7 @@ with tab_stress:
         }, na_rep="—").map(
             color_recovery_table, subset=["1Y Recovery"] if "1Y Recovery" in recovery_df.columns else []
         ).set_properties(**{
-            "color": "#E8EDF2",
+            "color": "#1a202c",
             "font-family": "JetBrains Mono, monospace",
             "font-size": "0.8rem",
         }).set_table_styles([
@@ -1004,13 +1004,13 @@ with tab_quality:
                 return "background-color: #3D0000; color: #FF4444"
             elif "OVERRIDE" in val_str:
                 return "background-color: #1a1040; color: #A78BFA"
-            return "color: #E8EDF2"
+            return "color: #1a202c"
 
         st.dataframe(
             quality_df.style.map(
                 color_confidence, subset=["Used"]
             ).set_properties(**{
-                "color": "#E8EDF2",
+                "color": "#1a202c",
                 "font-family": "JetBrains Mono, monospace",
                 "font-size": "0.8rem",
             }).set_table_styles([
