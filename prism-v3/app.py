@@ -1313,7 +1313,7 @@ with tab_income:
         ).map(
             color_signal, subset=["Signal"] if "Signal" in table_df.columns else []
         ).set_properties(**{
-            "color": "#C0CCD8",
+            "color": "#1a202c",
             "font-family": "JetBrains Mono, monospace",
             "font-size": "0.75rem",
         }).set_table_styles([

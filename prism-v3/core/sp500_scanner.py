@@ -251,6 +251,37 @@ def _fetch_with_fallback(fetchers: list, label: str = "") -> tuple[dict | None, 
     return None, "NO_DATA"
 
 
+def _fetch_and_merge(fetchers: list, min_years: int = 6) -> tuple[dict | None, str]:
+    """Fetch from primary source, then fill gaps from secondary sources.
+
+    Unlike pure fallback, this merges data across sources to maximize
+    year coverage (critical for 5Y CAGR which needs 6 years of data).
+    """
+    merged = {}
+    sources_used = []
+
+    for name, fn in fetchers:
+        try:
+            data = fn()
+            if data:
+                new_keys = 0
+                for year, val in data.items():
+                    if year not in merged:
+                        merged[year] = val
+                        new_keys += 1
+                if new_keys > 0:
+                    sources_used.append(name)
+                # Stop once we have enough years
+                if len(merged) >= min_years:
+                    break
+        except Exception:
+            continue
+
+    if not merged:
+        return None, "NO_DATA"
+    return merged, "+".join(sources_used)
+
+
 # ---------------------------------------------------------------------------
 #  Growth Calculation
 # ---------------------------------------------------------------------------
@@ -348,13 +379,13 @@ def scan_sp500(
             text=f"Scanning {symbol} ({idx + 1}/{total})"
         )
 
-        # Fetch net income with fallback
+        # Fetch net income — merge sources for full 5Y coverage
         ni_fetchers = [
             ("YF", lambda s=symbol: _fetch_net_income_yf(s)),
             ("FMP", lambda s=symbol: _fetch_net_income_fmp(s, fmp_key)),
             ("AV", lambda s=symbol: _fetch_net_income_av(s, av_key)),
         ]
-        ni_data, ni_source = _fetch_with_fallback(ni_fetchers, f"{symbol} NI")
+        ni_data, ni_source = _fetch_and_merge(ni_fetchers, min_years=6)
 
         # Fetch price with fallback
         price_fetchers = [
