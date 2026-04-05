@@ -14,6 +14,8 @@ from datetime import datetime
 
 from core.data_pipeline import fetch_all_data
 from core.scoring import run_scoring
+from core.sp500_scanner import scan_sp500
+from config.sp500_tickers import get_sp500_tickers, get_sp500_sectors
 
 # ---------------------------------------------------------------------------
 #  Page Config
@@ -44,11 +46,13 @@ settings, watchlist = load_config()
 import os
 FMP_KEY = os.environ.get("FMP_API_KEY", settings["api_keys"]["fmp"])
 FH_KEY = os.environ.get("FINNHUB_API_KEY", settings["api_keys"]["finnhub"])
+AV_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", settings["api_keys"].get("alpha_vantage", ""))
 
 # Also check st.secrets for Streamlit Cloud
 try:
     FMP_KEY = st.secrets.get("FMP_API_KEY", FMP_KEY)
     FH_KEY = st.secrets.get("FINNHUB_API_KEY", FH_KEY)
+    AV_KEY = st.secrets.get("ALPHA_VANTAGE_API_KEY", AV_KEY)
 except Exception:
     pass
 
@@ -569,8 +573,8 @@ PRISM_COLORSCALE = ["#FF4444", "#FFB800", "#00FF88"]
 # ---------------------------------------------------------------------------
 #  Tab Layout
 # ---------------------------------------------------------------------------
-tab_watchlist, tab_detail, tab_stress, tab_quality = st.tabs([
-    "WATCHLIST", "STOCK DETAIL", "STRESS TEST", "DATA QUALITY"
+tab_watchlist, tab_detail, tab_stress, tab_quality, tab_income = st.tabs([
+    "WATCHLIST", "STOCK DETAIL", "STRESS TEST", "DATA QUALITY", "INCOME vs PRICE"
 ])
 
 
@@ -1151,11 +1155,379 @@ with tab_quality:
             st.markdown(f"- `{tk}`: {g:.1%}")
 
 
+# ========================= TAB 5: INCOME vs PRICE ==========================
+with tab_income:
+    st.markdown("### Net Income Growth vs Price Growth — S&P 500 Scanner")
+    st.caption("Identify stocks where earnings growth diverges from price growth")
+
+    # Controls
+    col_ctrl1, col_ctrl2, col_ctrl3, col_ctrl4 = st.columns([2, 1, 1, 1])
+
+    sp500_df = get_sp500_tickers()
+    all_sectors = get_sp500_sectors(sp500_df)
+
+    with col_ctrl1:
+        selected_sectors = st.multiselect(
+            "Sector Filter",
+            options=all_sectors,
+            default=[],
+            placeholder="All Sectors",
+            key="income_sectors"
+        )
+
+    with col_ctrl2:
+        period_focus = st.radio(
+            "Period Focus", ["1Y", "3Y", "5Y"], index=1,
+            horizontal=True, key="income_period"
+        )
+
+    with col_ctrl3:
+        min_mcap = st.number_input(
+            "Min Mkt Cap ($B)", value=1.0, step=1.0, min_value=0.0,
+            key="income_mcap"
+        )
+
+    with col_ctrl4:
+        gap_threshold = st.number_input(
+            "Min |Gap| (%)", value=5.0, step=1.0, min_value=0.0,
+            key="income_gap_thresh"
+        )
+
+    scan_clicked = st.button("SCAN S&P 500", type="primary", key="btn_scan_sp500")
+
+    if scan_clicked:
+        sector_filter = selected_sectors if selected_sectors else None
+        scan_results = scan_sp500(
+            tickers_df=sp500_df,
+            fmp_key=FMP_KEY,
+            av_key=AV_KEY,
+            sectors=sector_filter,
+        )
+        st.session_state["scan_results"] = scan_results
+
+    if "scan_results" in st.session_state and st.session_state["scan_results"] is not None:
+        scan_df = st.session_state["scan_results"].copy()
+
+        # Apply market cap filter
+        if min_mcap > 0:
+            scan_df = scan_df[scan_df["Mkt Cap ($B)"] >= min_mcap]
+
+        # Determine which gap column to focus on
+        gap_col = f"Gap {period_focus}"
+        ni_col = f"NI CAGR {period_focus}"
+        price_col = f"Price CAGR {period_focus}"
+
+        # Apply gap threshold filter
+        if gap_threshold > 0:
+            scan_df = scan_df[
+                scan_df[gap_col].apply(
+                    lambda x: abs(x) >= gap_threshold / 100 if x is not None and not (isinstance(x, float) and np.isnan(x)) else False
+                )
+            ]
+
+        # Sort by gap (biggest positive gap = most undervalued first)
+        scan_df = scan_df.sort_values(gap_col, ascending=False, na_position="last")
+        scan_df = scan_df.reset_index(drop=True)
+        scan_df.index += 1
+        scan_df.index.name = "Rank"
+
+        # KPI Cards
+        valid_gaps = scan_df[gap_col].dropna()
+        n_under = len(valid_gaps[valid_gaps > 0.05])
+        n_over = len(valid_gaps[valid_gaps < -0.05])
+        avg_gap = valid_gaps.mean() if len(valid_gaps) > 0 else 0
+
+        under_color = "green" if n_under > 0 else "amber"
+        over_color = "red" if n_over > 0 else "amber"
+        gap_color = "green" if avg_gap > 0 else "red" if avg_gap < 0 else "amber"
+
+        st.markdown(f"""
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 1.5rem 0;">
+            <div class="kpi-card">
+                <div class="kpi-label">STOCKS SCANNED</div>
+                <div class="kpi-value amber">{len(scan_df)}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">UNDERVALUED SIGNALS</div>
+                <div class="kpi-value {under_color}">{n_under}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">OVERVALUED SIGNALS</div>
+                <div class="kpi-value {over_color}">{n_over}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">AVG GAP ({period_focus})</div>
+                <div class="kpi-value {gap_color}">{avg_gap:.1%}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Main table
+        st.markdown(f"#### Discrepancy Table — sorted by {period_focus} Gap")
+
+        display_cols = ["Symbol", "Sector", "Price", "Mkt Cap ($B)"]
+        for p in [1, 3, 5]:
+            display_cols += [f"NI CAGR {p}Y", f"Price CAGR {p}Y", f"Gap {p}Y"]
+        display_cols += ["Signal", "NI Source"]
+
+        table_df = scan_df[[c for c in display_cols if c in scan_df.columns]].copy()
+
+        # Format percentage columns
+        pct_cols = [c for c in table_df.columns if "CAGR" in c or "Gap" in c]
+
+        def color_gap(val):
+            if val is None or (isinstance(val, float) and np.isnan(val)):
+                return "color: #556677"
+            if val > 0.05:
+                return "background-color: #003D22; color: #00FF88; font-weight: 600"
+            elif val > 0:
+                return "color: #00FF88"
+            elif val > -0.05:
+                return "color: #FF4444"
+            else:
+                return "background-color: #3D0000; color: #FF4444; font-weight: 600"
+
+        def color_signal(val):
+            v = str(val)
+            if v in ("UNDERVALUED", "TURNAROUND"):
+                return "background-color: #003D22; color: #00FF88; font-weight: 700"
+            elif v == "MILD UNDER":
+                return "color: #00FF88"
+            elif v == "FAIR":
+                return "color: #FFB800"
+            elif v == "MILD OVER":
+                return "color: #FF4444"
+            elif v == "OVERVALUED":
+                return "background-color: #3D0000; color: #FF4444; font-weight: 700"
+            return "color: #556677"
+
+        gap_cols_only = [c for c in table_df.columns if "Gap" in c]
+        styled = table_df.style.format(
+            {c: "{:.1%}" for c in pct_cols}, na_rep="—"
+        ).format(
+            {"Price": "${:.2f}", "Mkt Cap ($B)": "{:.1f}"}, na_rep="—"
+        ).map(
+            color_gap, subset=gap_cols_only
+        ).map(
+            color_signal, subset=["Signal"] if "Signal" in table_df.columns else []
+        ).set_properties(**{
+            "color": "#1a202c",
+            "font-family": "JetBrains Mono, monospace",
+            "font-size": "0.75rem",
+        }).set_table_styles([
+            {"selector": "th", "props": [
+                ("background-color", "#0d1320"),
+                ("color", "#8899AA"),
+                ("font-family", "JetBrains Mono, monospace"),
+                ("font-size", "0.65rem"),
+                ("text-transform", "uppercase"),
+                ("letter-spacing", "0.04em"),
+                ("position", "sticky"),
+                ("top", "0"),
+                ("z-index", "1"),
+            ]},
+        ])
+
+        st.dataframe(styled, use_container_width=True, height=500)
+
+        # Charts
+        chart_col1, chart_col2 = st.columns(2)
+
+        with chart_col1:
+            # Scatter: NI CAGR vs Price CAGR
+            scatter_df = scan_df.dropna(subset=[ni_col, price_col]).copy()
+            if not scatter_df.empty:
+                scatter_df["_ni_pct"] = scatter_df[ni_col] * 100
+                scatter_df["_price_pct"] = scatter_df[price_col] * 100
+                scatter_df["_mcap_size"] = scatter_df["Mkt Cap ($B)"].clip(lower=1)
+
+                fig_scatter = px.scatter(
+                    scatter_df,
+                    x="_ni_pct",
+                    y="_price_pct",
+                    color="Sector",
+                    size="_mcap_size",
+                    hover_name="Symbol",
+                    hover_data={
+                        "_ni_pct": ":.1f",
+                        "_price_pct": ":.1f",
+                        "Mkt Cap ($B)": ":.1f",
+                        "_mcap_size": False,
+                    },
+                    labels={
+                        "_ni_pct": f"Net Income CAGR {period_focus} (%)",
+                        "_price_pct": f"Price CAGR {period_focus} (%)",
+                    },
+                )
+
+                # Add 45-degree fair-value line
+                max_range = max(
+                    abs(scatter_df["_ni_pct"].max()),
+                    abs(scatter_df["_price_pct"].max()),
+                    abs(scatter_df["_ni_pct"].min()),
+                    abs(scatter_df["_price_pct"].min()),
+                    50,
+                )
+                fig_scatter.add_trace(go.Scatter(
+                    x=[-max_range, max_range],
+                    y=[-max_range, max_range],
+                    mode="lines",
+                    line=dict(color="#FFB800", dash="dash", width=1),
+                    name="Fair Value Line",
+                    showlegend=False,
+                ))
+
+                fig_scatter.update_layout(
+                    **plotly_layout(
+                        title=f"NI Growth vs Price Growth ({period_focus})",
+                        showlegend=True,
+                        legend=dict(
+                            font=dict(size=9),
+                            bgcolor="rgba(0,0,0,0)",
+                        ),
+                        height=450,
+                    )
+                )
+
+                # Annotations
+                fig_scatter.add_annotation(
+                    x=max_range * 0.7, y=max_range * 0.3,
+                    text="UNDERVALUED",
+                    font=dict(color="#00FF88", size=10),
+                    showarrow=False, opacity=0.4,
+                )
+                fig_scatter.add_annotation(
+                    x=max_range * 0.3, y=max_range * 0.7,
+                    text="OVERVALUED",
+                    font=dict(color="#FF4444", size=10),
+                    showarrow=False, opacity=0.4,
+                )
+
+                st.plotly_chart(fig_scatter, use_container_width=True)
+
+        with chart_col2:
+            # Top 10 undervalued + overvalued bars
+            valid_df = scan_df.dropna(subset=[gap_col]).copy()
+            if not valid_df.empty:
+                top_under = valid_df.nlargest(10, gap_col)
+                top_over = valid_df.nsmallest(10, gap_col)
+                bar_df = pd.concat([top_under, top_over]).drop_duplicates(subset="Symbol")
+                bar_df = bar_df.sort_values(gap_col, ascending=True)
+                bar_df["Gap %"] = bar_df[gap_col] * 100
+                bar_df["Color"] = bar_df[gap_col].apply(
+                    lambda x: "#00FF88" if x > 0 else "#FF4444"
+                )
+
+                fig_bar = go.Figure(go.Bar(
+                    x=bar_df["Gap %"],
+                    y=bar_df["Symbol"],
+                    orientation="h",
+                    marker_color=bar_df["Color"],
+                    text=bar_df["Gap %"].apply(lambda x: f"{x:+.1f}%"),
+                    textposition="outside",
+                    textfont=dict(size=10),
+                ))
+
+                fig_bar.update_layout(
+                    **plotly_layout(
+                        title=f"Top Discrepancies ({period_focus})",
+                        height=450,
+                        xaxis_title="Gap (pp)",
+                    )
+                )
+
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+        # Drill-down: Stock detail
+        st.markdown("---")
+        st.markdown("#### Stock Drill-Down")
+
+        drill_ticker = st.selectbox(
+            "Select a stock for detail",
+            options=scan_df["Symbol"].tolist(),
+            key="income_drill"
+        )
+
+        if drill_ticker:
+            row = scan_df[scan_df["Symbol"] == drill_ticker].iloc[0]
+
+            detail_col1, detail_col2 = st.columns(2)
+
+            with detail_col1:
+                # NI vs Price growth comparison bar chart
+                periods = ["1Y", "3Y", "5Y"]
+                ni_vals = [row.get(f"NI CAGR {p}") for p in periods]
+                price_vals = [row.get(f"Price CAGR {p}") for p in periods]
+
+                ni_pct = [v * 100 if v is not None and not (isinstance(v, float) and np.isnan(v)) else 0 for v in ni_vals]
+                price_pct = [v * 100 if v is not None and not (isinstance(v, float) and np.isnan(v)) else 0 for v in price_vals]
+
+                fig_compare = go.Figure()
+                fig_compare.add_trace(go.Bar(
+                    name="Net Income CAGR",
+                    x=periods, y=ni_pct,
+                    marker_color="#00FF88",
+                    text=[f"{v:.1f}%" for v in ni_pct],
+                    textposition="outside",
+                ))
+                fig_compare.add_trace(go.Bar(
+                    name="Price CAGR",
+                    x=periods, y=price_pct,
+                    marker_color="#FF6600",
+                    text=[f"{v:.1f}%" for v in price_pct],
+                    textposition="outside",
+                ))
+                fig_compare.update_layout(
+                    **plotly_layout(
+                        title=f"{drill_ticker} — NI vs Price Growth",
+                        barmode="group",
+                        showlegend=True,
+                        height=350,
+                        legend=dict(font=dict(size=10), bgcolor="rgba(0,0,0,0)"),
+                    )
+                )
+                st.plotly_chart(fig_compare, use_container_width=True)
+
+            with detail_col2:
+                # Detail metrics
+                st.markdown(f"""
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div class="kpi-card">
+                        <div class="kpi-label">PRICE</div>
+                        <div class="kpi-value amber">${row.get('Price', 0):.2f}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">MKT CAP</div>
+                        <div class="kpi-value amber">${row.get('Mkt Cap ($B)', 0):.1f}B</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">SECTOR</div>
+                        <div class="kpi-value" style="color: #C0CCD8; font-size: 0.9rem;">{row.get('Sector', '—')}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">SIGNAL</div>
+                        <div class="kpi-value {'green' if row.get('Signal') in ('UNDERVALUED', 'TURNAROUND', 'MILD UNDER') else 'red' if row.get('Signal') in ('OVERVALUED', 'MILD OVER') else 'amber'}">{row.get('Signal', '—')}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">NI DATA SOURCE</div>
+                        <div class="kpi-value" style="color: #8899AA; font-size: 0.9rem;">{row.get('NI Source', '—')}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">PRICE DATA SOURCE</div>
+                        <div class="kpi-value" style="color: #8899AA; font-size: 0.9rem;">{row.get('Price Source', '—')}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+    else:
+        st.info("Click **SCAN S&P 500** to start the analysis. Scanning all 500 stocks takes a few minutes.")
+
+
 # ---------------------------------------------------------------------------
 #  Footer
 # ---------------------------------------------------------------------------
 st.markdown(f"""
 <div class="prism-footer">
-    PRISM v3.0 &nbsp;|&nbsp; DATA: FMP + FINNHUB + YFINANCE &nbsp;|&nbsp; {len(active_tickers)} STOCKS &nbsp;|&nbsp; {datetime.now().strftime('%Y-%m-%d %H:%M')}
+    PRISM v3.0 &nbsp;|&nbsp; DATA: FMP + FINNHUB + YFINANCE + ALPHA VANTAGE &nbsp;|&nbsp; {len(active_tickers)} STOCKS &nbsp;|&nbsp; {datetime.now().strftime('%Y-%m-%d %H:%M')}
 </div>
 """, unsafe_allow_html=True)

@@ -1,7 +1,8 @@
 {
   "api_keys": {
     "fmp": "FMP_API_KEY",
-    "finnhub": "FINNHUB_API_KEY"
+    "finnhub": "FINNHUB_API_KEY",
+    "alpha_vantage": "ALPHA_VANTAGE_API_KEY"
   },
   "scoring_weights": {
     "fundamental": 0.40,
