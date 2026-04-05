@@ -1277,29 +1277,31 @@ with tab_income:
 
         def color_gap(val):
             if val is None or (isinstance(val, float) and np.isnan(val)):
-                return "color: #556677"
+                return "color: #8899AA"
             if val > 0.05:
-                return "background-color: #003D22; color: #00FF88; font-weight: 600"
+                return "background-color: #003D22; color: #00FF88 !important; font-weight: 600"
             elif val > 0:
-                return "color: #00FF88"
+                return "color: #00FF88 !important"
             elif val > -0.05:
-                return "color: #FF4444"
+                return "color: #FF6666 !important"
             else:
-                return "background-color: #3D0000; color: #FF4444; font-weight: 600"
+                return "background-color: #3D0000; color: #FF6666 !important; font-weight: 600"
 
         def color_signal(val):
             v = str(val)
             if v in ("UNDERVALUED", "TURNAROUND"):
-                return "background-color: #003D22; color: #00FF88; font-weight: 700"
+                return "background-color: #003D22; color: #00FF88 !important; font-weight: 700"
             elif v == "MILD UNDER":
-                return "color: #00FF88"
+                return "color: #00FF88 !important"
             elif v == "FAIR":
-                return "color: #FFB800"
+                return "color: #FFB800 !important"
             elif v == "MILD OVER":
-                return "color: #FF4444"
+                return "color: #FF6666 !important"
             elif v == "OVERVALUED":
-                return "background-color: #3D0000; color: #FF4444; font-weight: 700"
-            return "color: #556677"
+                return "background-color: #3D0000; color: #FF6666 !important; font-weight: 700"
+            elif v == "NO DATA":
+                return "color: #8899AA !important"
+            return "color: #C0CCD8 !important"
 
         gap_cols_only = [c for c in table_df.columns if "Gap" in c]
         styled = table_df.style.format(
@@ -1311,7 +1313,7 @@ with tab_income:
         ).map(
             color_signal, subset=["Signal"] if "Signal" in table_df.columns else []
         ).set_properties(**{
-            "color": "#1a202c",
+            "color": "#C0CCD8",
             "font-family": "JetBrains Mono, monospace",
             "font-size": "0.75rem",
         }).set_table_styles([
