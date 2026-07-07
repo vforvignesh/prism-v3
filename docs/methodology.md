@@ -71,10 +71,12 @@ per unit of crash risk. The portfolio with the best Edge Ratio is recommended.
 it uses today's beta/valuation inputs).
 
 Calibration snapshot (2026-07-07 watchlist): COVID Crash is well calibrated
-(mean bias −1.4%, rank correlation +0.57). **Rate Shock is ~20pp too lenient**
-(mean bias +19.6% vs 2022 reality; SE, NU, NFLX were the biggest misses) —
-consider raising its `market_dd` or the growth-sector multipliers before
-leaning on that scenario.
+(mean bias −0.5%, rank correlation +0.56). Rate Shock was originally ~20pp
+too lenient vs 2022; its sector multipliers were recalibrated in 2026-07 by
+moving each sector halfway toward the per-sector implied ratio (half-step to
+avoid overfitting single-stock samples). After recalibration: mean bias
++9.9%, rank correlation +0.72, Pearson +0.79. Rerun
+`scripts/calibrate_shocks.py` after changing the watchlist mix.
 
 ## Changes vs notebook v2.3
 
