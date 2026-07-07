@@ -1,0 +1,11 @@
+# Deployment requirements (Render / Streamlit Cloud).
+# For local development prefer: pip install -e ".[dev,app]"
+streamlit>=1.40
+yfinance>=0.2.50
+requests>=2.31
+pandas>=2.0
+numpy>=1.24
+pyyaml>=6.0
+pyarrow>=14.0
+matplotlib>=3.7
+lxml>=5.0

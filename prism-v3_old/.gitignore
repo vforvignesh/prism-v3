@@ -1,9 +1,0 @@
-__pycache__/
-*.pyc
-.env
-*.egg-info/
-dist/
-build/
-.streamlit/secrets.toml
-data/*.json
-!data/.gitkeep
