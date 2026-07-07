@@ -26,6 +26,20 @@ python3 -m venv .venv
 
 ## Usage
 
+**Dashboard (primary interface):**
+
+```bash
+.venv/bin/python -m pip install -e ".[app]"   # once
+.venv/bin/python -m streamlit run app.py
+```
+
+Tabs: **RANKINGS** (edit watchlist in the sidebar → RUN PRISM → scored table,
+portfolios, recommendation, HTML report download), **STRESS TEST** (shock
+heatmap), **SCANNER** (S&P 500 / Nasdaq 100 earnings-vs-price growth gaps for
+swing candidates), **HISTORY** (score trends across runs + past reports).
+
+**CLI (headless runs, cron, etc.):**
+
 ```bash
 .venv/bin/python run.py            # uses same-day fetch cache when present
 .venv/bin/python run.py --refresh  # force refetch of market data

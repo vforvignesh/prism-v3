@@ -41,10 +41,12 @@ def save_fetch_cache(df, qdf, cache_dir=".cache"):
     qdf.to_parquet(q_path, index=False)
 
 
-def fetch_all_data(tickers, cfg, cache_dir=".cache", refresh=False):
+def fetch_all_data(tickers, cfg, cache_dir=".cache", refresh=False,
+                   progress_cb=None):
     """Fetch all inputs for the watchlist. Returns (df, quality_df).
 
-    Uses a same-day disk cache unless refresh=True.
+    Uses a same-day disk cache unless refresh=True. progress_cb, if given,
+    is called with (done, total, symbol) as each ticker completes.
     """
     if not refresh:
         cached = load_cached_fetch(cache_dir)
@@ -61,6 +63,8 @@ def fetch_all_data(tickers, cfg, cache_dir=".cache", refresh=False):
     quality_log = []
 
     for i, sym in enumerate(tickers):
+        if progress_cb:
+            progress_cb(i + 1, len(tickers), sym)
         tk, yh = fetch_yahoo_snapshot(sym)
         price, mcap, beta = yh["price"], yh["mcap"], yh["beta"]
         high52, low52 = yh["high52"], yh["low52"]
