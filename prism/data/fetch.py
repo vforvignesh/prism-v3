@@ -73,15 +73,17 @@ def fetch_all_data(tickers, cfg, fmp_key, fh_key, cache_dir=".cache", refresh=Fa
     rows = []
     quality_log = []
 
-    # Source availability — try first 3 tickers before disabling
+    # FMP gates some symbols per-tier, so it stays enabled unless the key
+    # itself is rejected. Finnhub's eps-estimate endpoint is all-or-nothing.
     fmp_enabled = bool(fmp_key)
     fh_enabled = bool(fh_key)
     if not fmp_enabled:
         print("  ⚠️  No FMP_API_KEY set — FMP disabled")
     if not fh_enabled:
         print("  ⚠️  No FINNHUB_API_KEY set — Finnhub disabled")
-    fmp_fail_count = 0
-    fh_fail_count = 0
+    fmp_gated = []
+    fmp_ok_count = 0
+    fh_ok_count = 0
 
     for i, sym in enumerate(tickers):
         # --- yfinance: price, beta, market cap, targets ---
@@ -96,34 +98,31 @@ def fetch_all_data(tickers, cfg, fmp_key, fh_key, cache_dir=".cache", refresh=Fa
         # --- FMP: analyst estimates (primary growth source) ---
         fmp_g26 = fmp_g27 = fmp_fwd_eps = np.nan
         if fmp_enabled:
-            fmp_data = fetch_fmp_estimates(sym, fmp_key, session=session)
-            if fmp_data is not None:
+            fmp_data, fmp_status = fetch_fmp_estimates(sym, fmp_key, session=session)
+            if fmp_status == "ok":
                 fmp_g26, fmp_g27, fmp_fwd_eps, _ = calc_growth_from_fmp(fmp_data)
-                if i == 0:
+                fmp_ok_count += 1
+                if fmp_ok_count == 1:
                     print(f"  ✅ FMP connected — got {len(fmp_data)} entries for {sym}")
-            else:
-                fmp_fail_count += 1
-                if i < 3:
-                    print(f"  ⚠️  FMP returned nothing for {sym} (fail {fmp_fail_count}/3)")
-                if fmp_fail_count >= 3:
-                    print("  ❌ FMP failed on first 3 tickers — disabling FMP")
-                    fmp_enabled = False
+            elif fmp_status == "gated":
+                fmp_gated.append(sym)
+            elif fmp_status == "auth":
+                print("  ❌ FMP rejected the API key — disabling FMP")
+                fmp_enabled = False
 
         # --- Finnhub: EPS estimates (validation) ---
         fh_g26 = fh_g27 = np.nan
         if fh_enabled:
-            fh_data = fetch_finnhub_estimates(sym, fh_key, session=session)
-            if fh_data is not None:
+            fh_data, fh_status = fetch_finnhub_estimates(sym, fh_key, session=session)
+            if fh_status == "ok":
                 fh_g26, fh_g27 = calc_growth_from_finnhub(fh_data)
-                if i == 0:
+                fh_ok_count += 1
+                if fh_ok_count == 1:
                     print(f"  ✅ Finnhub connected — got {len(fh_data)} entries for {sym}")
-            else:
-                fh_fail_count += 1
-                if i < 3:
-                    print(f"  ⚠️  Finnhub returned nothing for {sym} (fail {fh_fail_count}/3)")
-                if fh_fail_count >= 3:
-                    print("  ❌ Finnhub failed on first 3 tickers — disabling (likely premium-only)")
-                    fh_enabled = False
+            elif fh_status == "auth":
+                print("  ❌ Finnhub eps-estimate not available on this key "
+                      "(premium endpoint) — disabling Finnhub")
+                fh_enabled = False
 
         # --- Cross-validate FMP vs Finnhub ---
         g2026, c26 = validate_growth(fmp_g26, fh_g26)
@@ -152,7 +151,14 @@ def fetch_all_data(tickers, cfg, fmp_key, fh_key, cache_dir=".cache", refresh=Fa
         fwd_pe = np.nan
         if pd.notna(fmp_fwd_eps) and fmp_fwd_eps > 0 and pd.notna(price) and price > 0:
             fwd_pe = price / fmp_fwd_eps
-        else:
+            # FMP reports some foreign listings' EPS in local currency while the
+            # price is the USD ADR (e.g. TSM in TWD) — an absurd P/E means a
+            # currency mismatch, so discard it and fall back to yfinance.
+            if fwd_pe < 3:
+                log.warning("%s: FMP-implied P/E %.2f looks like a currency mismatch"
+                            " — falling back to yfinance", sym, fwd_pe)
+                fwd_pe = np.nan
+        if pd.isna(fwd_pe):
             yf_eps = fetch_yahoo_forward_eps(tk, sym)
             if pd.notna(yf_eps) and yf_eps > 0 and pd.notna(price):
                 fwd_pe = price / yf_eps
@@ -179,12 +185,12 @@ def fetch_all_data(tickers, cfg, fmp_key, fh_key, cache_dir=".cache", refresh=Fa
 
     df = pd.DataFrame(rows)
     qdf = pd.DataFrame(quality_log)
-    print_quality_scorecard(qdf, fmp_enabled, fh_enabled)
+    print_quality_scorecard(qdf, fmp_enabled, fh_enabled, fmp_gated)
     save_fetch_cache(df, qdf, cache_dir)
     return df, qdf
 
 
-def print_quality_scorecard(qdf, fmp_enabled, fh_enabled):
+def print_quality_scorecard(qdf, fmp_enabled, fh_enabled, fmp_gated=()):
     print(f"\n{'='*90}")
     print("  DATA QUALITY SCORECARD")
     print(f"{'='*90}")
@@ -202,6 +208,9 @@ def print_quality_scorecard(qdf, fmp_enabled, fh_enabled):
               | (qdf["G27_conf"].isin(["LOW", "DEFAULT", "NONE"]))]
     if len(bad) > 0:
         print(f"\n  ⚠️  Stocks needing overrides: {bad['Stock'].tolist()}")
+    if fmp_gated:
+        print(f"\n  💰 FMP free tier gated {len(fmp_gated)} symbols (fell back to yfinance): "
+              f"{list(fmp_gated)}")
 
     # Loud gate: single-source runs are a materially different quality regime.
     if not fmp_enabled and not fh_enabled:

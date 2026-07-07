@@ -10,7 +10,14 @@ log = logging.getLogger("prism.finnhub")
 
 
 def fetch_finnhub_estimates(symbol, api_key, session=None):
-    """Finnhub annual EPS estimates (may require paid plan). Returns list or None."""
+    """Finnhub annual EPS estimates (premium-only endpoint on free keys).
+
+    Returns (data, status) where status is one of:
+      ok      - data is a non-empty list of estimate dicts
+      auth    - endpoint not accessible on this key (HTTP 401/403) -> disable
+      empty   - valid response, no estimates for this symbol
+      error   - network/HTTP/parse failure
+    """
     http = session or requests
     url = (
         "https://finnhub.io/api/v1/stock/eps-estimate"
@@ -20,19 +27,22 @@ def fetch_finnhub_estimates(symbol, api_key, session=None):
         resp = http.get(url, timeout=10)
     except requests.RequestException as e:
         log.warning("Finnhub %s: request failed: %s", symbol, e)
-        return None
+        return None, "error"
+    if resp.status_code in (401, 403):
+        log.warning("Finnhub %s: no access (HTTP %s) — eps-estimate needs a paid plan",
+                    symbol, resp.status_code)
+        return None, "auth"
     if resp.status_code != 200:
         log.warning("Finnhub %s: HTTP %s: %s", symbol, resp.status_code, resp.text[:200])
-        return None
+        return None, "error"
     try:
         data = resp.json()
     except ValueError:
         log.warning("Finnhub %s: non-JSON response: %s", symbol, resp.text[:200])
-        return None
+        return None, "error"
     if not data or "data" not in data or len(data.get("data", [])) == 0:
-        log.info("Finnhub %s: empty result", symbol)
-        return None
-    return data["data"]
+        return None, "empty"
+    return data["data"], "ok"
 
 
 def calc_growth_from_finnhub(fh_data):

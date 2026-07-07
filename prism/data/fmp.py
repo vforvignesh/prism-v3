@@ -1,4 +1,9 @@
-"""Financial Modeling Prep client: analyst EPS estimates (primary growth source)."""
+"""Financial Modeling Prep client: analyst EPS estimates (primary growth source).
+
+The /stable/ endpoints gate some symbols behind paid tiers (HTTP 402) while
+serving others on the free tier, so a failure for one symbol says nothing
+about the next — callers should keep trying per symbol.
+"""
 import logging
 
 import numpy as np
@@ -10,7 +15,15 @@ log = logging.getLogger("prism.fmp")
 
 
 def fetch_fmp_estimates(symbol, api_key, session=None):
-    """FMP analyst estimates. Returns a list of annual estimate dicts, or None on failure."""
+    """FMP analyst estimates.
+
+    Returns (data, status) where status is one of:
+      ok      - data is a non-empty list of estimate dicts
+      gated   - this symbol requires a paid plan (HTTP 402)
+      auth    - API key invalid/expired (HTTP 401/403) -> disable the source
+      empty   - valid response, no estimates for this symbol
+      error   - network/HTTP/parse failure
+    """
     http = session or requests
     url = (
         "https://financialmodelingprep.com/stable/analyst-estimates"
@@ -20,22 +33,27 @@ def fetch_fmp_estimates(symbol, api_key, session=None):
         resp = http.get(url, timeout=10)
     except requests.RequestException as e:
         log.warning("FMP %s: request failed: %s", symbol, e)
-        return None
+        return None, "error"
+    if resp.status_code == 402:
+        log.info("FMP %s: symbol gated behind paid plan", symbol)
+        return None, "gated"
+    if resp.status_code in (401, 403):
+        log.warning("FMP %s: auth failure HTTP %s: %s", symbol, resp.status_code, resp.text[:200])
+        return None, "auth"
     if resp.status_code != 200:
         log.warning("FMP %s: HTTP %s: %s", symbol, resp.status_code, resp.text[:200])
-        return None
+        return None, "error"
     try:
         data = resp.json()
     except ValueError:
         log.warning("FMP %s: non-JSON response: %s", symbol, resp.text[:200])
-        return None
+        return None, "error"
     if isinstance(data, dict) and ("Error" in str(data) or "message" in data):
         log.warning("FMP %s: API error: %s", symbol, str(data)[:200])
-        return None
+        return None, "error"
     if not isinstance(data, list) or len(data) == 0:
-        log.info("FMP %s: empty result", symbol)
-        return None
-    return data
+        return None, "empty"
+    return data, "ok"
 
 
 def calc_growth_from_fmp(fmp_data):
@@ -45,7 +63,8 @@ def calc_growth_from_fmp(fmp_data):
     cal_eps = {}
     for entry in fmp_data:
         cy = map_fy_to_calendar(entry.get("date", ""))
-        eps = entry.get("estimatedEpsAvg")
+        # /stable/ uses "epsAvg"; the retired v3 API used "estimatedEpsAvg"
+        eps = entry.get("epsAvg", entry.get("estimatedEpsAvg"))
         if cy and eps is not None:
             cal_eps[cy] = eps
     e25, e26, e27 = cal_eps.get(2025), cal_eps.get(2026), cal_eps.get(2027)
