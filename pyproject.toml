@@ -5,10 +5,8 @@ description = "PRISM - quantitative stock screener, portfolio constructor, and s
 requires-python = ">=3.9"
 dependencies = [
     "yfinance>=0.2.50",
-    "requests>=2.31",
     "pandas>=2.0",
     "numpy>=1.24",
-    "python-dotenv>=1.0",
     "pyyaml>=6.0",
     "pyarrow>=14.0",
     "matplotlib>=3.7",

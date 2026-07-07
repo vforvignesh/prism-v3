@@ -1,9 +1,5 @@
-"""Configuration loading: config.yaml for settings, .env for API keys."""
-import os
-from pathlib import Path
-
+"""Configuration loading from config.yaml."""
 import yaml
-from dotenv import load_dotenv
 
 
 def load_config(path="config.yaml"):
@@ -31,9 +27,3 @@ def load_config(path="config.yaml"):
         "output_dir": raw.get("output_dir", "outputs"),
     }
     return raw["tickers"], cfg
-
-
-def load_api_keys(env_path=None):
-    """Load API keys from .env (or the environment). Returns (fmp_key, finnhub_key)."""
-    load_dotenv(env_path or Path(".env"))
-    return os.getenv("FMP_API_KEY", ""), os.getenv("FINNHUB_API_KEY", "")

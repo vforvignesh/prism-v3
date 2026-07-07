@@ -4,20 +4,21 @@ PRISM scores a watchlist of growth stocks on four dimensions, blends them into
 a composite score, constructs portfolios, and stress-tests those portfolios
 against probability-weighted macro shock scenarios.
 
-## Data sources
+## Data source
 
-| Source | Role | Notes |
-|---|---|---|
-| FMP `/stable/analyst-estimates` | Primary EPS growth estimates | Free tier gates many symbols (HTTP 402) per symbol; EPS field is `epsAvg`. Foreign listings may report EPS in local currency — implied P/E under 3x is discarded as a currency mismatch. |
-| Finnhub `eps-estimate` | Cross-validation of FMP growth | Premium-only endpoint; disabled automatically on HTTP 403. |
-| yfinance | Price, beta, market cap, 52w range, analyst targets, price history; growth fallback | Class-share tickers are remapped (`BRK.B` → `BRK-B`). |
+Yahoo Finance (via yfinance) supplies everything: price, beta, market cap,
+52-week range, analyst targets, price history, forward EPS, and analyst
+growth estimates. Class-share tickers are remapped (`BRK.B` → `BRK-B`).
 
-Cross-validation confidence: **HIGH** = FMP and Finnhub agree within 15%,
-**MED** = within 30% (averaged) or single-source, **LOW** = >30% disagreement
-(FMP kept), **YF** = yfinance fallback, **DEFAULT** = no source (4% assumed).
+Growth-estimate confidence: **YF** = Yahoo analyst estimate, **OVERRIDE** =
+pinned in `config.yaml` `growth_overrides`, **DEFAULT** = no estimate
+available (a conservative 4% is assumed and the stock is flagged).
 
-Fiscal years ending Jan–May are attributed to the *prior* calendar year
-(e.g. NVDA's FY ending Jan 2027 counts as calendar 2026).
+FMP and Finnhub were removed in v3: Finnhub's estimates endpoint is
+premium-only, FMP's free tier covered only ~25% of the watchlist, and the
+partial coverage added noise (e.g. local-currency EPS for foreign listings)
+without a genuine independent cross-check. Suspicious growth numbers should
+instead be verified manually and pinned via `growth_overrides`.
 
 ## Dimensions (default weights)
 
@@ -88,3 +89,5 @@ leaning on that scenario.
    entirely analyst upside + positioning heuristics. Weights rebalanced
    45/35/20 → 30/30/25/15.
 5. Optional sector-relative growth ranking (`sector_relative` in config.yaml).
+6. FMP and Finnhub removed entirely — Yahoo Finance is the single source and
+   no API keys are required (items 1–2 above are kept for historical record).

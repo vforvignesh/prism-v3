@@ -10,7 +10,7 @@ import argparse
 import logging
 import warnings
 
-from prism.config import load_api_keys, load_config
+from prism.config import load_config
 from prism.data.fetch import fetch_all_data
 from prism.export import export_csvs
 from prism.htmlreport import export_html
@@ -36,9 +36,8 @@ def main():
         format="  %(levelname)s %(name)s: %(message)s")
 
     tickers, cfg = load_config(args.config)
-    fmp_key, fh_key = load_api_keys()
 
-    df, quality_df = fetch_all_data(tickers, cfg, fmp_key, fh_key, refresh=args.refresh)
+    df, quality_df = fetch_all_data(tickers, cfg, refresh=args.refresh)
     print("\n  Running PRISM scoring engine...")
     df = run_prism(df, cfg)
     print("  Building portfolios...")

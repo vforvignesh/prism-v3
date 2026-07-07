@@ -63,12 +63,13 @@ def render_html_report(df, portfolios, shock_results, quality_df, cfg,
         f"M {cfg['weight_momentum']:.0%} / R {cfg['weight_resilience']:.0%}</div>")
 
     # Data quality banner
-    yf_only = quality_df["G26_conf"].isin(["YF", "DEFAULT"]).mean()
-    if yf_only > 0.5:
+    defaulted = quality_df[(quality_df["G26_conf"] == "DEFAULT")
+                           | (quality_df["G27_conf"] == "DEFAULT")]["Stock"].tolist()
+    if defaulted:
         parts.append(
-            f"<div class='warn'>⚠️ {yf_only:.0%} of 2026 growth estimates come from "
-            "yfinance alone (no cross-validation). Treat growth-driven ranks "
-            "accordingly.</div>")
+            f"<div class='warn'>⚠️ No growth estimate for {', '.join(defaulted)} — "
+            "a flat 4% was assumed. Consider <code>growth_overrides</code> in "
+            "config.yaml.</div>")
 
     # Rankings table
     parts.append("<h2>Rankings</h2><div class='section'><table>")
@@ -133,12 +134,12 @@ def render_html_report(df, portfolios, shock_results, quality_df, cfg,
     # Quality appendix
     parts.append("<h2>Data quality</h2><div class='section'><table>")
     parts.append("<tr><th>Stock</th><th>G26 conf</th><th>G27 conf</th>"
-                 "<th>FMP g26</th><th>Final g26</th><th>FMP g27</th><th>Final g27</th></tr>")
+                 "<th>Final g26</th><th>Final g27</th></tr>")
     for _, q in quality_df.iterrows():
         parts.append(
             f"<tr><td>{q['Stock']}</td><td>{q['G26_conf']}</td><td>{q['G27_conf']}</td>"
-            f"<td>{_fmt(q['FMP_g26'], '+.0%')}</td><td>{_fmt(q['Final_g26'], '+.0%')}</td>"
-            f"<td>{_fmt(q['FMP_g27'], '+.0%')}</td><td>{_fmt(q['Final_g27'], '+.0%')}</td></tr>")
+            f"<td>{_fmt(q['Final_g26'], '+.0%')}</td>"
+            f"<td>{_fmt(q['Final_g27'], '+.0%')}</td></tr>")
     parts.append("</table></div>")
 
     return ("<!doctype html><html><head><meta charset='utf-8'>"
