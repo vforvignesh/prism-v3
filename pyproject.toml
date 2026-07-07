@@ -1,0 +1,25 @@
+[project]
+name = "prism"
+version = "3.0.0"
+description = "PRISM - quantitative stock screener, portfolio constructor, and shock stress-tester"
+requires-python = ">=3.9"
+dependencies = [
+    "yfinance>=0.2.50",
+    "requests>=2.31",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "pyarrow>=14.0",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["prism", "prism.data"]

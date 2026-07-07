@@ -1,0 +1,52 @@
+# PRISM watchlist and scoring configuration
+tickers:
+  - AVGO
+  - MU
+  - TSM
+  - ASML
+  - "000660.KS"
+  - APP
+  - RBRK
+  - NFLX
+  - RDDT
+  - UBER
+  - SE
+  - LLY
+  - TMDX
+  - GOOG
+  - AMZN
+  - META
+  - NVDA
+  - MSFT
+  - KNSL
+  - CRCL
+  - AXP
+  - DNP.WA
+  - MCO
+  - BRK.B
+  - FICO
+  - V
+  - MA
+  - NU
+  - CVNA
+  - NBIS
+
+weights:
+  growth: 0.35
+  value: 0.25
+  momentum: 0.20
+  resilience: 0.20
+
+blend_2026: 0.75
+blend_2027: 0.25
+growth_cap: 2.00
+edge_size: 10
+fragile_threshold: 3.0
+
+# Manual growth overrides: ticker -> [g2026, g2027] as decimals
+growth_overrides: {}
+
+force_include: []
+force_exclude: []
+
+output_dir: outputs
