@@ -1,5 +1,7 @@
-# Secrets
+# Environment / secrets
 .env
+.env.local
+*.secret
 
 # Run artifacts
 outputs/
@@ -7,10 +9,21 @@ outputs/
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
+venv/
+env/
 *.egg-info/
+dist/
+build/
 .pytest_cache/
+
+# Claude Code session data
+.claude/
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/secrets.toml

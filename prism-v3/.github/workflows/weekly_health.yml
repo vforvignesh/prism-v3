@@ -1,0 +1,39 @@
+name: Weekly Portfolio Health Check
+
+on:
+  schedule:
+    # Run every Sunday at 10 AM HKT (2 AM UTC)
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install yfinance requests numpy pandas scipy ta
+
+      - name: Run weekly health check
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python alerts/health_check.py
+
+      - name: Commit score snapshots
+        run: |
+          git config user.name "PRISM Bot"
+          git config user.email "prism@automated.bot"
+          git add data/ || true
+          git diff --staged --quiet || git commit -m "Weekly health check $(date +%Y-%m-%d)"
+          git push || true
