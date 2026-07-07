@@ -9,7 +9,7 @@ WATCHLIST_COLS = [
     "dim_resilience", "2026 Growth Rate", "2027 Growth Rate", "blended_growth",
     "P/E.1", "peg_proxy", "Beta", "52w_position", "stretch_score", "Average Outcome",
     "Market Cap", "fragile_flag", "fragile_points", "shock_sector", "Industry",
-    "Price", "Target Mean",
+    "Price", "Target Mean", "Ret 3M", "Ret 6M", "Ret 12M", "momentum_return",
 ]
 
 

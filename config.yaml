@@ -44,6 +44,9 @@ edge_size: 10
 fragile_threshold: 3.0
 
 # Manual growth overrides: ticker -> [g2026, g2027] as decimals
+# Rank growth 50% globally / 50% within sector (reduces structural sector bias)
+sector_relative: false
+
 growth_overrides: {}
 
 force_include: []

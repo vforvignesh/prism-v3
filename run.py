@@ -13,6 +13,7 @@ import warnings
 from prism.config import load_api_keys, load_config
 from prism.data.fetch import fetch_all_data
 from prism.export import export_csvs
+from prism.htmlreport import export_html
 from prism.portfolio import build_portfolios
 from prism.report import generate_report
 from prism.scoring import run_prism
@@ -45,7 +46,9 @@ def main():
     print("  Running SHOCK stress tests...")
     shock = run_shock(df, portfolios)
     generate_report(df, portfolios, fragile, reps, shock, cfg)
-    export_csvs(df, portfolios, shock, quality_df, cfg)
+    out_dir = export_csvs(df, portfolios, shock, quality_df, cfg)
+    export_html(df, portfolios, shock, quality_df, cfg, out_dir,
+                fragile_stocks=fragile)
     print("\n  PRISM complete!")
 
 

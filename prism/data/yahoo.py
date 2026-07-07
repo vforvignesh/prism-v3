@@ -76,6 +76,24 @@ def fetch_yahoo_growth(tk, symbol):
         return np.nan, np.nan
 
 
+def fetch_yahoo_returns(tk, symbol):
+    """Trailing 3/6/12-month price returns from daily adjusted closes."""
+    if tk is None:
+        return np.nan, np.nan, np.nan
+    try:
+        closes = tk.history(period="1y", auto_adjust=True)["Close"].dropna()
+    except Exception as e:
+        log.info("yfinance %s: price history unavailable: %s", symbol, e)
+        return np.nan, np.nan, np.nan
+    if len(closes) < 64:
+        return np.nan, np.nan, np.nan
+    last = closes.iloc[-1]
+    r3 = last / closes.iloc[-64] - 1
+    r6 = last / closes.iloc[-127] - 1 if len(closes) >= 127 else np.nan
+    r12 = last / closes.iloc[0] - 1 if len(closes) >= 240 else np.nan
+    return r3, r6, r12
+
+
 def fetch_yahoo_forward_eps(tk, symbol):
     """Fallback current-year average EPS estimate from yfinance."""
     if tk is None:

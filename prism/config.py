@@ -20,6 +20,7 @@ def load_config(path="config.yaml"):
         "blend_2026": raw.get("blend_2026", 0.75),
         "blend_2027": raw.get("blend_2027", 0.25),
         "growth_cap": raw.get("growth_cap", 2.00),
+        "sector_relative": raw.get("sector_relative", False),
         "edge_size": raw.get("edge_size", 10),
         "fragile_threshold": raw.get("fragile_threshold", 3.0),
         "growth_overrides": {

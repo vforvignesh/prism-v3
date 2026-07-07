@@ -12,7 +12,8 @@ from urllib3.util.retry import Retry
 from .common import validate_growth
 from .finnhub import calc_growth_from_finnhub, fetch_finnhub_estimates
 from .fmp import calc_growth_from_fmp, fetch_fmp_estimates
-from .yahoo import fetch_yahoo_forward_eps, fetch_yahoo_growth, fetch_yahoo_snapshot
+from .yahoo import (fetch_yahoo_forward_eps, fetch_yahoo_growth,
+                    fetch_yahoo_returns, fetch_yahoo_snapshot)
 
 log = logging.getLogger("prism.fetch")
 
@@ -95,6 +96,8 @@ def fetch_all_data(tickers, cfg, fmp_key, fh_key, cache_dir=".cache", refresh=Fa
         avg_outcome = ((target_mean / price) - 1) if (
             pd.notna(price) and pd.notna(target_mean) and price > 0) else 0.0
 
+        r3m, r6m, r12m = fetch_yahoo_returns(tk, sym)
+
         # --- FMP: analyst estimates (primary growth source) ---
         fmp_g26 = fmp_g27 = fmp_fwd_eps = np.nan
         if fmp_enabled:
@@ -174,7 +177,8 @@ def fetch_all_data(tickers, cfg, fmp_key, fh_key, cache_dir=".cache", refresh=Fa
             "52 Week High": high52, "52 Week Low": low52, "P/E.1": fwd_pe,
             "Industry": industry, "Target Mean": target_mean,
             "Average Outcome": avg_outcome,
-            "2026 Growth Rate": g2026, "2027 Growth Rate": g2027})
+            "2026 Growth Rate": g2026, "2027 Growth Rate": g2027,
+            "Ret 3M": r3m, "Ret 6M": r6m, "Ret 12M": r12m})
 
         pe_s = f"{fwd_pe:>6.1f}" if pd.notna(fwd_pe) else "   N/A"
         b_s = f"{beta:>5.2f}" if pd.notna(beta) else "  N/A"

@@ -52,6 +52,34 @@ class TestPctRank:
         assert r.iloc[0] == 100.0
 
 
+class TestMomentum:
+    def test_higher_returns_score_higher_all_else_equal(self):
+        df = make_fixture()
+        df["Ret 3M"] = np.linspace(-0.2, 0.6, len(df))
+        df["Ret 6M"] = np.linspace(-0.3, 0.9, len(df))
+        df["Ret 12M"] = np.linspace(-0.4, 1.2, len(df))
+        base = df.copy()
+        # equalize everything else that feeds momentum
+        for col in ["Average Outcome", "Beta", "P/E.1"]:
+            base[col] = base[col].mean()
+        base["52 Week Low"] = 50.0
+        base["52 Week High"] = 100.0
+        base["Price"] = 75.0
+        scored = run_prism(base, CFG)
+        assert scored.set_index("Stock")["dim_momentum"].loc["T11"] > \
+            scored.set_index("Stock")["dim_momentum"].loc["T00"]
+
+    def test_missing_return_columns_neutral(self):
+        df = run_prism(make_fixture(), CFG)  # fixture has no Ret columns
+        assert df["dim_momentum"].notna().all()
+
+    def test_sector_relative_flag(self):
+        df = make_fixture()
+        cfg = dict(CFG, sector_relative=True)
+        scored = run_prism(df, cfg)
+        assert scored["dim_growth"].between(0, 100).all()
+
+
 class TestRunPrism:
     def test_scores_bounded_and_complete(self):
         df = run_prism(make_fixture(), CFG)

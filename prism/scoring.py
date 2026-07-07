@@ -6,10 +6,20 @@ from .shock import SECTOR_MAP, TICKER_SECTOR_OVERRIDE
 
 
 def pct_rank(series, ascending=True):
-    if ascending:
-        return series.rank(pct=True, na_option="keep") * 100
-    return ((1 - series.rank(pct=True, na_option="keep")) * 100
-            + (100 / len(series)))
+    return series.rank(pct=True, ascending=ascending, na_option="keep") * 100
+
+
+def sector_blend_rank(series, sectors, ascending=True):
+    """Half global percentile, half within-sector percentile.
+
+    The 50/50 blend keeps small sectors (1-3 names) from collapsing to
+    meaningless within-group ranks while still normalizing structural
+    differences (e.g. semis' raw growth vs insurers').
+    """
+    global_r = pct_rank(series, ascending=ascending)
+    sector_r = series.groupby(sectors).rank(
+        pct=True, ascending=ascending, na_option="keep") * 100
+    return global_r * 0.5 + sector_r * 0.5
 
 
 def score_growth(df, cfg):
@@ -20,10 +30,14 @@ def score_growth(df, cfg):
                             + df["g27_capped"] * cfg["blend_2027"])
     df["growth_durability"] = np.where(
         df["g26_capped"] > 0.05, (df["g27_capped"] / df["g26_capped"]).clip(0, 3), 0)
-    return (pct_rank(df["g26_capped"]) * 0.40
-            + pct_rank(df["g27_capped"]) * 0.15
-            + pct_rank(df["blended_growth"]) * 0.30
-            + pct_rank(df["growth_durability"]) * 0.15)
+    if cfg.get("sector_relative") and "shock_sector" in df.columns:
+        rank = lambda s: sector_blend_rank(s, df["shock_sector"])  # noqa: E731
+    else:
+        rank = pct_rank
+    return (rank(df["g26_capped"]) * 0.40
+            + rank(df["g27_capped"]) * 0.15
+            + rank(df["blended_growth"]) * 0.30
+            + rank(df["growth_durability"]) * 0.15)
 
 
 def score_value(df):
@@ -59,9 +73,22 @@ def score_momentum(df):
     s += np.where(df["52w_position"] < 0.30, 10,
                   np.where(df["52w_position"] < 0.50, 5, 0))
     df["stretch_score"] = s.clip(0, 100)
-    return (pct_rank(df["Average Outcome"]) * 0.45
-            + df["stretch_score"] * 0.35
-            + pct_rank(df["52w_position"]) * 0.20)
+
+    # Real price momentum: 6M carries most weight, 3M recency, 12M trend.
+    # Neutral 50 when history is missing (new listings, fetch failures).
+    if "Ret 6M" in df.columns:
+        ret_blend = (df["Ret 3M"].fillna(df["Ret 6M"]) * 0.30
+                     + df["Ret 6M"] * 0.50
+                     + df["Ret 12M"].fillna(df["Ret 6M"]) * 0.20)
+        df["momentum_return"] = ret_blend
+        mom_r = pct_rank(ret_blend).fillna(50)
+    else:
+        df["momentum_return"] = np.nan
+        mom_r = pd.Series(50.0, index=df.index)
+    return (mom_r * 0.30
+            + pct_rank(df["Average Outcome"]) * 0.30
+            + df["stretch_score"] * 0.25
+            + pct_rank(df["52w_position"]) * 0.15)
 
 
 def score_resilience(df):
@@ -75,6 +102,10 @@ def score_resilience(df):
 
 
 def run_prism(df, cfg):
+    df["shock_sector"] = df["Industry"].map(SECTOR_MAP).fillna("default")
+    for t, sc in TICKER_SECTOR_OVERRIDE.items():
+        df.loc[df["Stock"] == t, "shock_sector"] = sc
+
     df["dim_growth"] = score_growth(df, cfg)
     df["dim_value"] = score_value(df)
     df["dim_momentum"] = score_momentum(df)
@@ -102,8 +133,4 @@ def run_prism(df, cfg):
     fp += np.where(rw > 3.0, 1.0, np.where(rw > 1.5, 0.5, 0))
     df["fragile_points"] = fp
     df["fragile_flag"] = fp >= cfg.get("fragile_threshold", 3.0)
-
-    df["shock_sector"] = df["Industry"].map(SECTOR_MAP).fillna("default")
-    for t, sc in TICKER_SECTOR_OVERRIDE.items():
-        df.loc[df["Stock"] == t, "shock_sector"] = sc
     return df.sort_values("prism_rank")
